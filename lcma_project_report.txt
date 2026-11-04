@@ -1,0 +1,186 @@
+PROJECT REPORT: LOCAL CAMPUS MANAGEMENT AGENT (LCMA)
+
+Course / Track: Project Defense - SST-2601
+Project Title: LCMA: Local Campus Management Agent
+Date: October 2026
+Location: Astana
+
+====================================================================
+1. EXECUTIVE SUMMARY
+====================================================================
+
+The Local Campus Management Agent (LCMA) is an integrated, multi-tier system engineered to transform a traditional university campus into a smart, efficient, and secure environment. Designed across six cohesive project stages, LCMA merges smart mobility, smart housing, and privacy-preserving safe access into a single unified architecture.
+
+The project progressed from an initial conceptual framework to a working prototype featuring a React frontend, Node.js/Express REST API, PostgreSQL database, and simulated IoT sensor data streams via WebSockets/MQTT.
+
+
+====================================================================
+2. SYSTEM OVERVIEW AND CORE PILLARS
+====================================================================
+
+LCMA is built around three operational pillars, supported by a privacy-first engineering approach:
+
+1. Smart Mobility:
+   - Pedestrian Balancing: Routes users along low-density, shaded pathways based on real-time zone congestion.
+   - Autonomous Fleet Management: Dynamically allocates campus shuttles and pods following density heatmaps.
+   - Micro-Climate Routing: Adjusts recommended routes according to live weather telemetry.
+   - Privacy-Preserving Heatmaps: Aggregates anonymous Wi-Fi signal counts into green, yellow, or red zone density indicators without collecting personal identity data or offloading raw video.
+
+2. Smart Housing:
+   - Interactive Layouts: Interactive room and desk selection prior to physical arrival.
+   - Live Bed Availability: Real-time visibility into bed capacity across all residence halls.
+   - Staggered Check-in: Automated scheduling for move-in appointments to prevent elevator and lobby congestion.
+
+3. Access & Safety:
+   - Mobile Credentials: Encrypted NFC and Bluetooth digital IDs stored in a mobile wallet.
+   - Edge AI & Privacy: Real-time on-premises video analytics for anomaly detection with automated face-blurring before events leave local storage.
+
+
+====================================================================
+3. NETWORK SEGMENTATION AND ARCHITECTURE
+====================================================================
+
+To maintain security across network tiers, traffic is segregated using Layer-3 switches and Access Control Lists (ACLs):
+
+- VLAN 10 (Students): 10.42.10.0/23 - Wi-Fi APs and mobile devices.
+- VLAN 20 (Staff): 10.42.20.0/24 - Managed PCs and staff Wi-Fi.
+- VLAN 30 (Servers): 10.42.30.0/24 - Telemetry bridges, brokers, and local Identity Providers (IdP).
+- VLAN 40 (IoT Devices): 10.42.40.0/24 - RFID readers, environmental sensors, and edge cameras.
+- VLAN 50 (Management): 10.42.50.0/24 - Restricted network management access.
+
+Data flows securely over standard protocols:
+- OIDC over HTTPS for sign-in and authentication.
+- HTTPS + JSON for rooms, bookings, and alert reviews.
+- mTLS over HTTPS for zone estimations and sensor integrations.
+
+
+====================================================================
+4. DATABASE ARCHITECTURE AND SCHEMA DESIGN
+====================================================================
+
+The relational database is built on PostgreSQL in Third Normal Form (3NF), encompassing 19 tables partitioned across three main functional domains:
+
+1. Housing & Identity (8 tables):
+   - app_user
+   - hall
+   - room
+   - bed
+   - housing_application
+   - allocation
+   - checkin_slot
+   - booking
+
+2. Mobility (5 tables):
+   - zone
+   - occupancy_sample
+   - route_request
+   - route_option
+   - fleet_status
+
+3. Access & Audit (6 tables):
+   - credential
+   - reader
+   - access_event
+   - security_alert
+   - edge_media
+   - audit_event
+
+Key Data Integrity Mechanisms:
+- Normalized Storage: Entity properties (such as hall_name) are defined once; dynamic states like free beds are computed on-the-fly rather than redundantly stored.
+- Referential & Domain Constraints: Enforced via foreign keys, CHECK constraints, and unique compound indexes to prevent double allocations.
+- Transactional Consistency: Housing allocations execute under explicit database lock mechanisms (checking availability and ownership simultaneously prior to writing booking and audit_event rows).
+
+
+====================================================================
+5. SECURITY, RISK MANAGEMENT AND FALLBACK POLICIES
+====================================================================
+
+Threat Matrix & Countermeasures:
+
+1. Phishing (Likelihood: High)
+   - Countermeasures: Staff Multi-Factor Authentication (MFA), active session revocation capabilities.
+
+2. Weak / Reused Passwords (Likelihood: High)
+   - Countermeasures: Campus Single Sign-On (SSO) integration, rate limits on authentication attempts.
+
+3. SQL Injection (Likelihood: Medium)
+   - Countermeasures: Parameterized queries, restricted database role privileges.
+
+4. Ransomware (Likelihood: Medium)
+   - Countermeasures: Segmented network via VLAN ACLs, immutable off-site backups.
+
+5. Data Leak / Privilege Escalation (Likelihood: Medium)
+   - Countermeasures: Server-side RBAC checks, row-level access policies, data encryption.
+
+6. Denial of Service (Likelihood: Medium)
+   - Countermeasures: Ingestion rate limits, edge caching, offline local fallback mode.
+
+7. Insider Misuse (Likelihood: Medium)
+   - Countermeasures: Principle of least privilege, audited access events (audit_event table).
+
+Backup and Recovery Metrics:
+- Recovery Point Objective (RPO): 15 Minutes (achieved via continuous WAL archiving alongside daily base backups).
+- Recovery Time Objective (RTO): 4 Hours.
+- Offline Fallback Execution: In the event of internet or cloud connectivity loss, door readers utilize locally cached, digitally signed access policies. Bookings pause gracefully without generating false confirmations.
+
+
+====================================================================
+6. IOT TELEMETRY PIPELINE, SMART RULES AND KPIS
+====================================================================
+
+Sensor Data Processing Pipeline:
+1. Data Ingestion: Devices (RFID Readers, Motion Sensors, GPS Trackers, Edge Cameras) publish data over MQTT/CoAP/TLS to the Campus Edge Gateway.
+2. Data Storage: Ingested readings pass to PostgreSQL (access_event, occupancy_sample, fleet_status tables).
+3. Analytics Engine: Automated Python/Pandas routines process incoming events to evaluate rules and update dashboard state.
+
+Automated Rules:
+- Climate Control Rule:
+  IF room_occupancy_status == 'Empty' FOR t > 30 mins THEN Set HVAC to ECO Mode (19 degrees C)
+
+- Access Security Threshold Rule:
+  IF count(access_denial) > 3 WITHIN 5 mins ON reader_id THEN Lock Reader & Raise Security Alert
+
+Key Performance Indicators (KPIs):
+- Zone Occupancy (%) = (Average People Count / Zone Capacity) * 100
+- Access Denial Rate (%) = (Denied Access Scans / Total Access Scans) * 100
+- Fleet Availability (%) = (Vehicles In Service / Total Fleet Size) * 100
+- Average Security Response Time = Average(Timestamp_Resolved - Timestamp_Raised)
+
+
+====================================================================
+7. END-TERM PROTOTYPE AND IMPLEMENTATION STATUS
+====================================================================
+
+Technology Stack:
+- Frontend: React SPA (Student and Admin portal interfaces, Nielsen-compliant UX, WCAG 2.2 AA accessibility features).
+- Backend: Node.js / Express REST API with JWT middleware and bcrypt password hashing.
+- Database: PostgreSQL (Core tables: app_user, room, booking, telemetry_event).
+- Telemetry & Real-Time Data: MQTT Simulator pushing data into a local engine with WebSocket connections for live client dashboard updates.
+
+Component Implementation Status:
+- PostgreSQL & CRUD API: DONE (Fully operational across 4 core tables)
+- Auth (Role Sign-in, JWT, bcrypt): DONE (Student and Admin server-side checks)
+- Smart Rules Dashboard: DONE (Real-time updates via WebSockets)
+- Telemetry Sensor Data: SIMULATED (Generator running over MQTT)
+- NFC Reader Sync: SIMULATED (Hardware software mock)
+- University SSO: MOCKED (Local sign-in mock)
+
+
+====================================================================
+8. TEAM RESPONSIBILITIES
+====================================================================
+
+- Miras (Backend Lead & Database): Designed the 19-table PostgreSQL relational schema, implemented backend CRUD handlers, and designed the integrated network architecture.
+- Diar (Security Lead & RBAC): Implemented bcrypt hashing, JWT middleware authentication, server-side role validation, input sanitization, and the IP/VLAN segmentation scheme.
+- Dauren (Frontend & Operations Dashboard): Developed the React SPA interfaces for both Student workflows and the Admin panel, focusing on usability heuristics and accessibility standards.
+- Dias (IoT Rules & Telemetry): Built the IoT telemetry simulator, engineered the automated rules engine, implemented WebSocket live updates, and designed risk mitigation plans.
+
+
+====================================================================
+9. NEXT STEPS AND ROADMAP
+====================================================================
+
+1. Production Identity Integration: Replace mocked authentication with full OpenID Connect (OIDC) integration against the official university SSO.
+2. Hardware Deployment: Transition from simulated sensor data to physical RFID readers, LoRaWAN trackers, and edge cameras.
+3. Resilience Testing: Conduct automated load testing, chaos testing for internet outage fallbacks, and database disaster recovery drills.
+4. Compliance & Audit: Finalize WCAG 2.2 AA compliance audits with real users and execute formal data retention agreements with campus IT.
